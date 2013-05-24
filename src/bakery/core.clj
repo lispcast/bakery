@@ -406,16 +406,26 @@
      (println "nothing")))
   :ok)
 
-(defn go-to [place]
+(defn go-to
+  "Go to the given location.
+   Possible locations are :prep-area, :fridge, and :pantry."
+  [place]
   (cond
    (not (_locations place))
    (error "I do not know where" place "is.")
+   (= place @location)
+   (do
+     (println "I am already in" place)
+     :ok)
    :else
    (dosync
+    (println "Going to" place)
     (ref-set location place)
     :ok)))
 
-(defn load-up [ingredient]
+(defn load-up
+  "Load an ingredient from storage to take to the prep area."
+  [ingredient]
   (cond
    (= :fridge @location)
    (if (_fridge-ingredients ingredient)
@@ -434,7 +444,9 @@
    :else
    (error "I can only load up at the fridge and pantry. I'm at the" @location)))
 
-(defn unload [ingredient]
+(defn unload
+  "Unload an ingredient in the prep area."
+  [ingredient]
   (cond
    (not= :prep-area @location)
    (error "I can only unload at the prep area")
@@ -448,24 +460,52 @@
     (alter loaded update-in [ingredient] dec)
     :ok)))
 
+(def orderid (atom (rand-int 10000)))
+
+
+(def streets ["Robot Ln", "Cyber Dr", "Electro Pkwy", "Servo St"])
+
+(defn get-morning-orders
+  "Get a new list of baking orders."
+  []
+  (doall
+   (for [i (range 10)]
+     {:orderid (+ i (swap! orderid inc))
+      :address (str (rand-int 1000) " " (rand-nth streets))
+      :items (into {} (for [x [:cake :cookies]
+                            :let [n (rand-int 25)]
+                            :when (pos? n)]
+                        [x n]))})))
+
+(defn delivery
+  "Notify the delivery bot that something is ready to deliver"
+  [receipt]
+  :ok)
+
 (defn bakery-help
   "Print out some helpful text to remember the available commands."
   []
   (println "Welcome to the bakery!")
   (println)
   (println "Available commands are: ")
-  (println "grab \t\t Pick something up.")
-  (println "squeeze \t Squeeze whatever you are holding.")
-  (println "release \t Release whatever you are holding.")
-  (println "scoop \t\t If you are holding the cup, fill it with an ingredient.")
-  (println "add-to-bowl \t Add the ingredient you are holding to the mixing bowl.")
-  (println "mix \t\t Mix the ingredients in the bowl.")
-  (println "pour-into-pan \t Pour the contents of the bowl into the pan.")
-  (println "bake-pan \t Put the pan in the oven for a certain number of minutes.")
-  (println "cool-pan \t After baking, put the pan on the cooling racks to cool.")
-  (println "\t\t Returns the id of the cooling rack.")
-  (println "status \t\t Print out the status of the bakery.")
-  (println "start-over \t If you get lost, this command will reset the bakery.")
+  (println "grab \t\t   Pick something up.")
+  (println "squeeze \t   Squeeze whatever you are holding.")
+  (println "release \t   Release whatever you are holding.")
+  (println "scoop \t\t   If you are holding the cup, fill it with an ingredient.")
+  (println "add-to-bowl \t   Add the ingredient you are holding to the mixing bowl.")
+  (println "mix \t\t   Mix the ingredients in the bowl.")
+  (println "pour-into-pan \t   Pour the contents of the bowl into the pan.")
+  (println "bake-pan \t   Put the pan in the oven for a certain number of minutes.")
+  (println "cool-pan \t   After baking, put the pan on the cooling racks to cool.")
+  (println "\t\t   Returns the id of the cooling rack.")
+  (println "status \t\t   Print out the status of the bakery.")
+  (println "start-over \t   If you get lost, this command will reset the bakery.")
+  (println "go-to \t\t   Go to the given location.")
+  (println "\t\t   Possible locations are :prep-area, :fridge, and :pantry.")
+  (println "load-up \t   Load an ingredient from storage to take to the prep area.")
+  (println "unload  \t   Unload an ingredient in the prep area.")
+  (println "get-morning-orders Get a new list of baking orders.")
+  (println "delivery \t   Notify the delivery bot that something is ready to deliver.")
   (println)
   (println "bakery-help \t Print out this message.")
 
