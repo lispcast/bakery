@@ -8,7 +8,11 @@
 (def cooling-rack (ref {}))
 (def location (ref :prep-area))
 (def loaded (ref {}))
-(def prep-stock (ref {}))
+(def prep-stock (ref {:egg 3
+                      :flour 3
+                      :sugar 2
+                      :butter 1
+                      :milk 1}))
 
 (def _ingredients #{:egg :flour :milk :sugar :butter})
 (def _fridge-ingredients #{:egg :milk :butter})
