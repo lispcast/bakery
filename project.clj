@@ -1,4 +1,4 @@
-(defproject bakery "0.0.1"
+(defproject bakery "0.0.4"
   :description "A bakery simulator for the Introduction to Clojure Videos from LispCast"
   :url "http://lispcast.com"
   :license {:name "Eclipse Public License"

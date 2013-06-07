@@ -25,11 +25,13 @@
 
 (defn- from-cup [x]
   (and
+   x
    (= (seq "cup-of-") (take 7 (name x)))
    (keyword (.substring (name x) 7))))
 
 (defn- from-squeezed [x]
   (and
+   x
    (= (seq "squeezed-") (take (count "squeezed-") (name x)))
    (keyword (.substring (name x) (count "squeezed-")))))
 
@@ -70,9 +72,7 @@
    (error ingredient "is not available at the prep area")
 
    @hand-state
-   (do
-     (println "I already have" (name @hand-state) "in my hand.")
-     :error)
+   (error "I already have" (name @hand-state) "in my hand.")
 
    :else
    (dosync
@@ -89,9 +89,7 @@
    (not= @location :prep-area)
    (error "I can only scoop things in the prep area. I am at the" @location)
    (not= @hand-state :cup)
-   (do
-     (println "I need to have the cup in my hand to scoop.")
-     :error)
+   (error "I need to have the cup in my hand to scoop.")
 
    (not (_scoopables ingredient))
    (error ingredient "is not scoopable.")
@@ -110,14 +108,10 @@
   []
   (cond
    (nil? @hand-state)
-   (do
-     (println "I am not holding anything.")
-     :error)
+   (error "I am not holding anything.")
 
    (not (_squeezables @hand-state))
-   (do
-     (println "I am holding" @hand-state ", which is not squeezable.")
-     :error)
+   (error "I am holding" @hand-state ", which is not squeezable.")
 
    :its-squeezable
    (dosync
@@ -129,28 +123,27 @@
   []
   (cond
    (nil? @hand-state)
-   (do
-     (println "I am not holding anything.")
-     :error)
+   (error "I am not holding anything.")
 
    (not= @location :prep-area)
    (error "Please only release things in the prep area.")
 
    :else
    (dosync
-    (ref-set hand-state nil)
     (cond
      (= @hand-state :cup)
      :ok
 
      (from-cup @hand-state)
-     (alter @prep-stock update-in [(from-cup @hand-state)] (fnil inc 0))
+     (alter prep-stock update-in [(from-cup @hand-state)] (fnil inc 0))
 
      (from-squeezed @hand-state)
-     (alter @prep-stock update-in [(from-squeezed @hand-state)] (fnil inc 0))
+     (alter prep-stock update-in [(from-squeezed @hand-state)] (fnil inc 0))
 
      :else
-     (alter @prep-stock update-in [@hand-state] (fnil inc 0)))
+     (alter prep-stock update-in [@hand-state] (fnil inc 0)))
+    (ref-set hand-state nil)
+
     :ok)))
 
 (defn add-to-bowl
@@ -161,9 +154,7 @@
    (error "I can only add things to the bowl in the prep area. I am at the" @location)
 
    (nil? @hand-state)
-   (do
-     (println "I am not holding anything.")
-     :error)
+   (error "I am not holding anything.")
 
    (= :butter @hand-state)
    (dosync
@@ -173,14 +164,10 @@
     :ok)
 
    (= :egg @hand-state)
-   (do
-     (println "Shouldn't I break the egg I am holding first?")
-     :error)
+   (error "Shouldn't I break the egg I am holding first?")
 
    (= :cup @hand-state)
-   (do
-     (println "My cup is empty.")
-     :error)
+   (error "My cup is empty.")
 
    (from-cup @hand-state)
    (dosync
@@ -197,9 +184,7 @@
     :ok)
 
    :otherwise
-   (do
-     (println "I'm lost.")
-     :error)))
+   (error "I'm lost.")))
 
 (defn mix
   "Mix the contents of the bowl."
@@ -207,10 +192,10 @@
   (cond
    (not= @location :prep-area)
    (error "I can only mix the bowl when I'm in the prep area. I'm at the" @location)
+
    (empty? @bowl-state)
-   (do
-     (println "The bowl is empty.")
-     :error))
+   (error "The bowl is empty."))
+
   :else
   (dosync
    (alter bowl-state assoc :mixed true)
@@ -226,9 +211,7 @@
   []
   (cond
    (not (:mixed @bowl-state))
-   (do
-     (println "The bowl is unmixed.")
-     :error)
+   (error "The bowl is unmixed.")
 
    :else
    (dosync
@@ -484,6 +467,7 @@
 (defn delivery
   "Notify the delivery bot that something is ready to deliver"
   [receipt]
+  (doall (:rackids receipt))
   :ok)
 
 (defn bakery-help
