@@ -14,11 +14,11 @@
                       :butter 1
                       :milk 1}))
 
-(def _ingredients #{:egg :flour :milk :sugar :butter})
+(def _ingredients #{:egg :flour :milk :sugar :butter :cocoa})
 (def _fridge-ingredients #{:egg :milk :butter})
-(def _pantry-ingredients #{:flour :sugar})
+(def _pantry-ingredients #{:flour :sugar :cocoa})
 (def _grabbables #{:egg :cup :butter})
-(def _scoopables #{:flour :milk :sugar})
+(def _scoopables #{:flour :milk :sugar :cocoa :ganache})
 (def _squeezables #{:egg})
 (def _locations #{:prep-area :fridge :pantry})
 
@@ -198,6 +198,10 @@
 
   :else
   (dosync
+   (when (= {:butter 2
+             :cocoa 2
+             :sugar 1} @bowl-ingredients)
+     (ref-set bowl-ingredients {:ganache 4}))
    (alter bowl-state assoc :mixed true)
    :ok))
 
@@ -247,6 +251,19 @@
     :burned-mess
     (= m 25)
     :cake)
+
+   (= p
+      {:flour 2
+       :milk 1
+       :egg 2
+       :ganache 4})
+   (cond
+    (< m 35)
+    :mushy-mess
+    (> m 35)
+    :burned-mess
+    (= m 35)
+    :brownies)
 
    (nil? p)
    (do
