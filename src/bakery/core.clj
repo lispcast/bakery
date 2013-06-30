@@ -476,7 +476,7 @@
    (for [i (range 10)]
      {:orderid (+ i (swap! orderid inc))
       :address (str (rand-int 1000) " " (rand-nth streets))
-      :items (into {} (for [x [:cake :cookies]
+      :items (into {} (for [x [:cake :cookies :brownies]
                             :let [n (rand-int 25)]
                             :when (pos? n)]
                         [x n]))})))
