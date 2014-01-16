@@ -1,6 +1,8 @@
 # bakery
 
-A Clojure library designed to ... well, that part is up to you.
+A bakery simulator for use in the LispCast Introduction to Clojure Videos.
+
+http://videos.lispcast.com/
 
 ## Usage
 
