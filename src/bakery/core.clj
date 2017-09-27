@@ -1,39 +1,43 @@
 (ns bakery.core
   (:require [clojure.string :as string]))
 
-(def bowl-state (ref {}))
-(def bowl-ingredients (ref {}))
-(def pan-state (ref {}))
-(def hand-state (ref nil))
-(def cooling-rack (ref {}))
-(def location (ref :prep-area))
-(def loaded (ref {}))
-(def prep-stock (ref {:egg 3
-                      :flour 3
-                      :sugar 2
-                      :butter 1
-                      :milk 1}))
+(def initial-prep-stock {:egg    300
+                         :flour  300
+                         :sugar  300
+                         :butter 300
+                         :milk   300
+                         :cocoa  300})
 
-(def _ingredients #{:egg :flour :milk :sugar :butter :cocoa})
+(def bowl-state       (ref {}))
+(def bowl-ingredients (ref {}))
+
+(def pan-state        (ref {}))
+(def hand-state       (ref nil))
+(def cooling-rack     (ref {}))
+(def location         (ref :prep-area))
+(def loaded           (ref {}))
+(def prep-stock       (ref initial-prep-stock))
+
+(def _ingredients        #{:egg :flour :milk :sugar :butter :cocoa})
 (def _fridge-ingredients #{:egg :milk :butter})
 (def _pantry-ingredients #{:flour :sugar :cocoa})
-(def _grabbables #{:egg :cup :butter})
-(def _scoopables #{:flour :milk :sugar :cocoa :ganache})
-(def _squeezables #{:egg})
-(def _locations #{:prep-area :fridge :pantry})
+(def _grabbables         #{:egg :cup :butter})
+(def _scoopables         #{:flour :milk :sugar :cocoa :ganache})
+(def _squeezables        #{:egg})
+(def _locations          #{:prep-area :fridge :pantry})
 
 
 (defn- from-cup [x]
-  (and
-   x
-   (= (seq "cup-of-") (take 7 (name x)))
-   (keyword (.substring (name x) 7))))
+  (let [c "cup-of-"]
+    (when (and x
+            (= (seq c) (take (count c) (name x))))
+      (keyword (.substring (name x) (count c))))))
 
 (defn- from-squeezed [x]
-  (and
-   x
-   (= (seq "squeezed-") (take (count "squeezed-") (name x)))
-   (keyword (.substring (name x) (count "squeezed-")))))
+  (let [s "squeezed-"]
+    (when (and x
+            (= (seq s) (take (count s) (name x))))
+      (keyword (.substring (name x) (count s))))))
 
 
 ;; just to get a clean state again
@@ -42,14 +46,14 @@
   "Clean up the bakery, empty hands, clean out the bowl, get a new pan. Good when you mess up and need a fresh start."
   []
   (dosync
-   (ref-set bowl-state {})
-   (ref-set bowl-ingredients {})
-   (ref-set pan-state {})
-   (ref-set hand-state nil)
-   (ref-set cooling-rack {})
-   (ref-set location :prep-area)
-   (ref-set loaded {})
-   (ref-set prep-stock {}))
+    (ref-set bowl-state {})
+    (ref-set bowl-ingredients {})
+    (ref-set pan-state {})
+    (ref-set hand-state nil)
+    (ref-set cooling-rack {})
+    (ref-set location :prep-area)
+    (ref-set loaded {})
+    (ref-set prep-stock initial-prep-stock))
 
   :ok)
 
@@ -61,140 +65,141 @@
   "Grab an item from the bakery (:egg, :butter, or :cup)."
   [ingredient]
   (cond
-   (not= @location :prep-area)
-   (error "I can only grab things in the prep area. I am at the" @location)
+    (not= @location :prep-area)
+    (error "I can only grab things in the prep area. I am at the" @location)
 
-   (not (_grabbables ingredient))
-   (error "I cannot grab" ingredient)
+    (not (contains? _grabbables ingredient))
+    (error "I cannot grab" ingredient)
 
-   (not (or (= :cup ingredient)
-            (pos? (@prep-stock ingredient 0))))
-   (error ingredient "is not available at the prep area")
+    (not (or (= :cup ingredient)
+           (pos? (@prep-stock ingredient 0))))
+    (error ingredient "is not available at the prep area")
 
-   @hand-state
-   (error "I already have" (name @hand-state) "in my hand.")
+    @hand-state
+    (error "I already have" (name @hand-state) "in my hand.")
 
-   :else
-   (dosync
-    (ref-set hand-state ingredient)
-    (when (not= :cup ingredient)
-      (alter prep-stock update-in [ingredient] dec))
-    :ok)))
+    :else
+    (dosync
+      (ref-set hand-state ingredient)
+      (when (not= :cup ingredient)
+        (alter prep-stock update-in [ingredient] dec))
+      :ok)))
 
 (defn scoop
   "If you are holding the cup, scoop up something into your measuring cup
    (milk, flour, or sugar)."
   [ingredient]
   (cond
-   (not= @location :prep-area)
-   (error "I can only scoop things in the prep area. I am at the" @location)
-   (not= @hand-state :cup)
-   (error "I need to have the cup in my hand to scoop.")
+    (not= @location :prep-area)
+    (error "I can only scoop things in the prep area. I am at the" @location)
 
-   (not (_scoopables ingredient))
-   (error ingredient "is not scoopable.")
+    (not= @hand-state :cup)
+    (error "I need to have the cup in my hand to scoop.")
 
-   (not (pos? (@prep-stock ingredient 0)))
-   (error ingredient "is not available at the prep area")
+    (not (_scoopables ingredient))
+    (error ingredient "is not scoopable.")
 
-   :everything-is-ok
-   (dosync
-    (ref-set hand-state (keyword (str "cup-of-" (name ingredient))))
-    (alter prep-stock update-in [ingredient] dec)
-    :ok)))
+    (not (pos? (@prep-stock ingredient 0)))
+    (error ingredient "is not available at the prep area")
+
+    :everything-is-ok
+    (dosync
+      (ref-set hand-state (keyword (str "cup-of-" (name ingredient))))
+      (alter prep-stock update-in [ingredient] dec)
+      :ok)))
 
 (defn squeeze
   "Squeeze the egg you are holding to crack it."
   []
   (cond
-   (nil? @hand-state)
-   (error "I am not holding anything.")
+    (nil? @hand-state)
+    (error "I am not holding anything.")
 
-   (not (_squeezables @hand-state))
-   (error "I am holding" @hand-state ", which is not squeezable.")
+    (not (_squeezables @hand-state))
+    (error "I am holding" @hand-state ", which is not squeezable.")
 
-   :its-squeezable
-   (dosync
-    (alter hand-state #(keyword (str "squeezed-" (name %))))
-    :ok)))
+    :its-squeezable
+    (dosync
+      (alter hand-state #(keyword (str "squeezed-" (name %))))
+      :ok)))
 
 (defn release
   "Release whatever you are holding in your hand."
   []
   (cond
-   (nil? @hand-state)
-   (error "I am not holding anything.")
+    (nil? @hand-state)
+    (error "I am not holding anything.")
 
-   (not= @location :prep-area)
-   (error "Please only release things in the prep area.")
+    (not= @location :prep-area)
+    (error "Please only release things in the prep area.")
 
-   :else
-   (dosync
-    (cond
-     (= @hand-state :cup)
-     :ok
+    :else
+    (dosync
+      (cond
+        (= @hand-state :cup)
+        :ok
 
-     (from-cup @hand-state)
-     (alter prep-stock update-in [(from-cup @hand-state)] (fnil inc 0))
+        (from-cup @hand-state)
+        (alter prep-stock update-in [(from-cup @hand-state)] (fnil inc 0))
 
-     (from-squeezed @hand-state)
-     (alter prep-stock update-in [(from-squeezed @hand-state)] (fnil inc 0))
+        (from-squeezed @hand-state)
+        (alter prep-stock update-in [(from-squeezed @hand-state)] (fnil inc 0))
 
-     :else
-     (alter prep-stock update-in [@hand-state] (fnil inc 0)))
-    (ref-set hand-state nil)
+        :else
+        (alter prep-stock update-in [@hand-state] (fnil inc 0)))
+      (ref-set hand-state nil)
 
-    :ok)))
+      :ok)))
 
 (defn add-to-bowl
   "Add what is in your hand to the bowl."
   []
   (cond
-   (not= @location :prep-area)
-   (error "I can only add things to the bowl in the prep area. I am at the" @location)
+    (not= @location :prep-area)
+    (error "I can only add things to the bowl in the prep area. I am at the" @location)
 
-   (nil? @hand-state)
-   (error "I am not holding anything.")
+    (nil? @hand-state)
+    (error "I am not holding anything.")
 
-   (= :butter @hand-state)
-   (dosync
-    (alter bowl-ingredients update-in [:butter] (fnil inc 0))
-    (ref-set hand-state nil)
-    (alter bowl-state assoc :mixed false)
-    :ok)
+    (= :butter @hand-state)
+    (dosync
+      (alter bowl-ingredients update-in [:butter] (fnil inc 0))
+      (ref-set hand-state nil)
+      (alter bowl-state assoc :mixed false)
+      :ok)
 
-   (= :egg @hand-state)
-   (error "Shouldn't I break the egg I am holding first?")
+    (= :egg @hand-state)
+    (error "Shouldn't I break the egg I am holding first?")
 
-   (= :cup @hand-state)
-   (error "My cup is empty.")
+    (= :cup @hand-state)
+    (error "My cup is empty.")
 
-   (from-cup @hand-state)
-   (dosync
-    (alter bowl-ingredients update-in [(from-cup @hand-state)] (fnil inc 0))
-    (ref-set hand-state :cup)
-    (alter bowl-state assoc :mixed false)
-    :ok)
+    (from-cup @hand-state)
+    (dosync
+      (alter bowl-ingredients update-in [(from-cup @hand-state)] (fnil inc 0))
+      (ref-set hand-state :cup)
+      (alter bowl-state assoc :mixed false)
+      :ok)
 
-   (from-squeezed @hand-state)
-   (dosync
-    (alter bowl-ingredients update-in [(from-squeezed @hand-state)] (fnil inc 0))
-    (ref-set hand-state nil)
-    (alter bowl-state assoc :mixed false)
-    :ok)
+    (from-squeezed @hand-state)
+    (dosync
+      (alter bowl-ingredients update-in [(from-squeezed @hand-state)] (fnil inc 0))
+      (ref-set hand-state nil)
+      (alter bowl-state assoc :mixed false)
+      :ok)
 
-   :otherwise
-   (error "I'm lost.")))
+    :otherwise
+    (error "I'm lost.")))
 
 (defn mix
   "Mix the contents of the bowl."
   []
   (cond
-   (not= @location :prep-area)
-   (error "I can only mix the bowl when I'm in the prep area. I'm at the" @location)
+    (not= @location :prep-area)
+    (error "I can only mix the bowl when I'm in the prep area. I'm at the" @location)
 
-   (empty? @bowl-state)
-   (error "The bowl is empty."))
+    (empty? @bowl-state)
+    (error "The bowl is empty."))
 
   :else
   (dosync
@@ -214,32 +219,32 @@
   "Pour the contents of the bowl into the baking pan."
   []
   (cond
-   (not (:mixed @bowl-state))
-   (error "The bowl is unmixed.")
+    (not (:mixed @bowl-state))
+    (error "The bowl is unmixed.")
 
-   :else
-   (dosync
-    (alter pan-state update-in [:contents] add-contents @bowl-ingredients)
-    (ref-set bowl-ingredients {})
-    (ref-set bowl-state {})
-    :ok)))
+    :else
+    (dosync
+      (alter pan-state update-in [:contents] add-contents @bowl-ingredients)
+      (ref-set bowl-ingredients {})
+      (ref-set bowl-state {})
+      :ok)))
 
 (defn- bake [p m]
   (cond
-   (= p
+    (= p
       {:flour 1
        :egg 1
        :sugar 1
        :butter 1})
-   (cond
-    (< m 30)
-    :mushy-mess
-    (> m 30)
-    :burned-mess
-    (= m 30)
-    :cookies)
+    (cond
+      (< m 30)
+      :mushy-mess
+      (> m 30)
+      :burned-mess
+      (= m 30)
+      :cookies)
 
-   (= p
+    (= p
       {:flour 2
        :egg 2
        :milk 1
@@ -277,18 +282,21 @@
   "Put the pan in the oven and bake it for so many minutes."
   [minutes]
   (cond
-   (not (number? minutes))
-   (error "I need a number of minutes to bake. You gave me a" (type minutes))
+    (nil? (:contents @pan-state))
+    (error "There's nothing in the pan!"
+      "Use (pour-into-pan) to transfer from the bowl to the pan.")
+    (not (number? minutes))
+    (error "I need a number of minutes to bake. You gave me a" (type minutes))
 
-   (not= @location :prep-area)
-   (error "I can only bake at the prep area. I am at the" @location)
+    (not= @location :prep-area)
+    (error "I can only bake at the prep area. I am at the" @location)
 
-   :else
+    :else
     (do
       (println "Baking" minutes "minutes. . .")
       (dosync
-       (alter pan-state update-in [:contents] bake minutes)
-       (alter pan-state assoc :baking true))
+        (alter pan-state update-in [:contents] bake minutes)
+        (alter pan-state assoc :baking true))
       (println "Done!")
       (println "The result is" (name (:contents @pan-state)))
       :ok)))
@@ -297,117 +305,119 @@
   "Remove the pan from the oven and put it in the cooling rack. Also grab a new pan to make something new! Returns the name of the cooling rack where the pan was placed."
   []
   (cond
-   (not= @location :prep-area)
-   (error "I can only cool the pan at the prep area. I am at the" @location)
+    (not= @location :prep-area)
+    (error "I can only cool the pan at the prep area. I am at the" @location)
 
-   :else
-   (let [r (gensym "cooling-rack-")]
-     (dosync
-      (alter cooling-rack assoc r (:contents @pan-state))
-      (ref-set pan-state {}))
-     (println "Cooling pan!")
-     (println "I now have a fresh pan.")
-     r)))
+    (nil? (:contents @pan-state))
+    (error "There's nothing in the pan! Use (pour-into-pan) to transfer from the bowl to the pan.")
+
+    :else
+    (let [r (gensym "cooling-rack-")]
+      (dosync
+        (alter cooling-rack assoc r (:contents @pan-state))
+        (ref-set pan-state {}))
+      (println "Cooling pan!")
+      (println "I now have a fresh pan.")
+      r)))
 
 (defn status
   "Look around and report the status of the bakery."
   []
   (dosync
 
-   (let [l (for [[k v] @loaded
-                 :when (pos? v)]
-             (if (_scoopables k)
-               (if (= 1 v)
-                 (str v " cup of " (name k))
-                 (str v " cups of " (name k)))
-               (if (= 1 v)
-                 (str v " " (name k))
-                 (str v " " (name k) "s"))))]
-     (print "Loaded up: ")
-     (if (seq l)
-       (println (string/join ", " l))
-       (println "nothing")))
+    (let [l (for [[k v] @loaded
+                  :when (pos? v)]
+              (if (_scoopables k)
+                (if (= 1 v)
+                  (str v " cup of " (name k))
+                  (str v " cups of " (name k)))
+                (if (= 1 v)
+                  (str v " " (name k))
+                  (str v " " (name k) "s"))))]
+      (print "Loaded up: ")
+      (if (seq l)
+        (println (string/join ", " l))
+        (println "nothing")))
 
-   (println)
+    (println)
 
-   (print "Location: ")
-   (println (string/replace (name @location) "-" " "))
+    (print "Location: ")
+    (println (string/replace (name @location) "-" " "))
 
-   (when (= @location :fridge)
-     (print "Available ingredients: ")
-     (if (seq _fridge-ingredients)
-       (println (string/join ", " (map name _fridge-ingredients)))
-       (println "none")))
+    (when (= @location :fridge)
+      (print "Available ingredients: ")
+      (if (seq _fridge-ingredients)
+        (println (string/join ", " (map name _fridge-ingredients)))
+        (println "none")))
 
-   (when (= @location :pantry)
-     (print "Available ingredients: ")
-     (if (seq _pantry-ingredients)
-       (println (string/join ", " (map name _pantry-ingredients)))
-       (println "none")))
+    (when (= @location :pantry)
+      (print "Available ingredients: ")
+      (if (seq _pantry-ingredients)
+        (println (string/join ", " (map name _pantry-ingredients)))
+        (println "none")))
 
-   (when (= @location :prep-area)
-     (let [i (for [[k v] @prep-stock
-                   :when (pos? v)]
-               (if (_scoopables k)
-                 (if (= 1 v)
-                   (str v " cup of " (name k))
-                   (str v " cups of " (name k)))
-                 (if (= 1 v)
-                   (str v " " (name k))
-                   (str v " " (name k) "s"))))]
-       (print "Available ingredients: ")
-       (if (seq i)
-         (println (string/join ", " i))
-         (println "none")))
+    (when (= @location :prep-area)
+      (let [i (for [[k v] @prep-stock
+                    :when (pos? v)]
+                (if (_scoopables k)
+                  (if (= 1 v)
+                    (str v " cup of " (name k))
+                    (str v " cups of " (name k)))
+                  (if (= 1 v)
+                    (str v " " (name k))
+                    (str v " " (name k) "s"))))]
+        (print "Available ingredients: ")
+        (if (seq i)
+          (println (string/join ", " i))
+          (println "none")))
 
-     (println)
+      (println)
 
-     (print "In hand: ")
-     (if @hand-state
-       (println (string/replace (name @hand-state) "-" " "))
-       (println "nothing"))
+      (print "In hand: ")
+      (if @hand-state
+        (println (string/replace (name @hand-state) "-" " "))
+        (println "nothing"))
 
-     (print "In bowl (")
-     (if (:mixed @bowl-state)
-       (print "mixed")
-       (print "unmixed"))
-     (print "): ")
-     (if (seq @bowl-ingredients)
-       (println (string/join ", " (for [[k v] @bowl-ingredients]
-                                    (if (_scoopables k)
-                                      (if (= 1 v)
-                                        (str v " cup of " (name k))
-                                        (str v " cups of " (name k)))
-                                      (if (= 1 v)
-                                        (str v " " (name k))
-                                        (str v " " (name k) "s"))))))
-       (println "nothing"))
-
-     (print "In pan")
-     (if (:baking @pan-state)
-       (print " (in oven)")
-       (print ""))
-     (print ": ")
-     (cond
-      (nil? (:contents @pan-state))
-      (println "nothing")
-
-      (keyword? (:contents @pan-state))
-      (println (name (:contents @pan-state)))
-
-      :else
-      (do
-        (println (string/join ", " (for [[k v] (:contents @pan-state)]
+      (print "In bowl (")
+      (if (:mixed @bowl-state)
+        (print "mixed")
+        (print "unmixed"))
+      (print "): ")
+      (if (seq @bowl-ingredients)
+        (println (string/join ", " (for [[k v] @bowl-ingredients]
                                      (if (_scoopables k)
-                                       (str v " cups of " (name k))
-                                       (str v " " (name k) "s")))))
-        (println "nothing"))))
-   (println)
-   (print "On the cooling rack: ")
-   (if (seq @cooling-rack)
-     (println (string/join ", " (for [[k v] @cooling-rack]
-                                  (str (name v) " in " (string/replace (name k) "-" " ")))))
-     (println "nothing")))
+                                       (if (= 1 v)
+                                         (str v " cup of " (name k))
+                                         (str v " cups of " (name k)))
+                                       (if (= 1 v)
+                                         (str v " " (name k))
+                                         (str v " " (name k) "s"))))))
+        (println "nothing"))
+
+      (print "In pan")
+      (if (:baking @pan-state)
+        (print " (in oven)")
+        (print ""))
+      (print ": ")
+      (cond
+        (nil? (:contents @pan-state))
+        (println "nothing")
+
+        (keyword? (:contents @pan-state))
+        (println (name (:contents @pan-state)))
+
+        :else
+        (do
+          (println (string/join ", " (for [[k v] (:contents @pan-state)]
+                                       (if (_scoopables k)
+                                         (str v " cups of " (name k))
+                                         (str v " " (name k) "s"))))))))
+    (println)
+    (print "On the cooling rack: ")
+    (if (seq @cooling-rack)
+      (println (string/join ", " (for [[k v] @cooling-rack]
+                                   (str (name v) " in " (string/replace (name k) "-" " ")))))
+      (println "nothing")))
   :ok)
 
 (defn go-to
@@ -415,76 +425,138 @@
    Possible locations are :prep-area, :fridge, and :pantry."
   [place]
   (cond
-   (not (_locations place))
-   (error "I do not know where" place "is.")
-   (= place @location)
-   (do
-     (println "I am already in" place)
-     :ok)
-   :else
-   (dosync
-    (println "Going to" place)
-    (ref-set location place)
-    :ok)))
+    (not (_locations place))
+    (error "I do not know where" place "is.")
+    (= place @location)
+    (do
+      (println "I am already in" place)
+      :ok)
+    :else
+    (dosync
+      (println "Going to" place)
+      (ref-set location place)
+      :ok)))
 
 (defn load-up
   "Load an ingredient from storage to take to the prep area."
   [ingredient]
   (cond
-   (= :fridge @location)
-   (if (_fridge-ingredients ingredient)
-     (dosync
-      (alter loaded update-in [ingredient] (fnil inc 0))
-      :ok)
-     (error ingredient "is not available at the fridge"))
+    (= :fridge @location)
+    (if (_fridge-ingredients ingredient)
+      (dosync
+        (alter loaded update-in [ingredient] (fnil inc 0))
+        :ok)
+      (error ingredient "is not available at the fridge"))
 
-   (= :pantry @location)
-   (if (_pantry-ingredients ingredient)
-     (dosync
-      (alter loaded update-in [ingredient] (fnil inc 0))
-      :ok)
-     (error ingredient "is not available at the pantry"))
+    (= :pantry @location)
+    (if (_pantry-ingredients ingredient)
+      (dosync
+        (alter loaded update-in [ingredient] (fnil inc 0))
+        :ok)
+      (error ingredient "is not available at the pantry"))
 
-   :else
-   (error "I can only load up at the fridge and pantry. I'm at the" @location)))
+    :else
+    (error "I can only load up at the fridge and pantry. I'm at the" @location)))
 
 (defn unload
   "Unload an ingredient in the prep area."
   [ingredient]
   (cond
-   (not= :prep-area @location)
-   (error "I can only unload at the prep area")
+    (not= :prep-area @location)
+    (error "I can only unload at the prep area")
 
-   (zero? (@loaded ingredient 0))
-   (error "I don't have any" ingredient "loaded")
+    (zero? (@loaded ingredient 0))
+    (error "I don't have any" ingredient "loaded")
 
-   :else
-   (dosync
-    (alter prep-stock update-in [ingredient] (fnil inc 0))
-    (alter loaded update-in [ingredient] dec)
-    :ok)))
+    :else
+    (dosync
+      (alter prep-stock update-in [ingredient] (fnil inc 0))
+      (alter loaded update-in [ingredient] dec)
+      :ok)))
 
 (def orderid (atom (rand-int 10000)))
 
-
 (def streets ["Robot Ln", "Cyber Dr", "Electro Pkwy", "Servo St"])
+
+(def remaining-orders (ref {}))
+(def problems (ref []))
 
 (defn get-morning-orders
   "Get a new list of baking orders."
   []
-  (doall
-   (for [i (range 10)]
-     {:orderid (+ i (swap! orderid inc))
-      :address (str (rand-int 1000) " " (rand-nth streets))
-      :items (into {} (for [x [:cake :cookies :brownies]
-                            :let [n (rand-int 25)]
-                            :when (pos? n)]
-                        [x n]))})))
+  (let [orders (for [i (range 10)]
+                 {:orderid (+ i (swap! orderid inc))
+                  :address (str (rand-int 1000) " " (rand-nth streets))
+                  :items (into {} (for [x [:cake :cookies]
+                                        :let [n (rand-int 25)]
+                                        :when (pos? n)]
+                                    [x n]))})
+        orders-by-id (into {} (map (juxt :orderid identity) orders))]
+    (dosync
+     (ref-set remaining-orders orders-by-id)
+     (ref-set problems []))
+    (dorun orders)
+    orders))
+
+(defn get-morning-orders-day3
+  "Get a new list of baking orders including brownies."
+  []
+  (let [orders (for [i (range 10)]
+                 {:orderid (+ i (swap! orderid inc))
+                  :address (str (rand-int 1000) " " (rand-nth streets))
+                  :items (into {} (for [x [:cake :cookies :brownies]
+                                        :let [n (rand-int 25)]
+                                        :when (pos? n)]
+                                    [x n]))})
+        orders-by-id (into {} (map (juxt :orderid identity) orders))]
+    (dosync
+     (ref-set remaining-orders orders-by-id)
+     (ref-set problems []))
+    (dorun orders)
+    orders))
+
+(defn get-morning-orders-count
+  "Get a new list of baking orders including brownies."
+  [n]
+  (let [orders (for [i (range n)]
+                 {:orderid (+ i (swap! orderid inc))
+                  :address (str (rand-int 1000) " " (rand-nth streets))
+                  :items (into {} (for [x [:cake :cookies :brownies]
+                                        :let [n (rand-int n)]
+                                        :when (pos? n)]
+                                    [x n]))})
+        orders-by-id (into {} (map (juxt :orderid identity) orders))]
+    (dosync
+     (ref-set remaining-orders orders-by-id)
+     (ref-set problems []))
+    (dorun orders)
+    orders))
+
+(defn order-items [order]
+  (reduce + 0 (for [[item amount] (:items order)]
+                amount)))
+
+(defn orders-items [orders]
+  (reduce + 0 (for [[orderid order] orders]
+                (order-items order))))
+
+(defn complete? [orders]
+  (zero? (orders-items orders)))
 
 (defn delivery
   "Notify the delivery bot that something is ready to deliver"
   [receipt]
-  (doall (:rackids receipt))
+  (dosync
+   (doseq [rack-id (:rackids receipt)]
+     (let [contents (get @cooling-rack rack-id)
+           needed (or (get-in @remaining-orders [(:orderid receipt) :items contents]) 0)]
+       (if (not (pos? needed))
+         (alter problems conj (str "Baked extra " contents " for order " (:orderid receipt) ". " needed))
+         (alter remaining-orders update-in [(:orderid receipt) :items contents] dec)))))
+  (doseq [p @problems]
+    (println p))
+  (when (complete? @remaining-orders)
+    (println "All morning orders are complete!"))
   :ok)
 
 (defn bakery-help
